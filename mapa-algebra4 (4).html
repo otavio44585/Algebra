@@ -1,0 +1,1315 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mapa de Distâncias - Álgebra Linear & Métricas</title>
+  
+  <!-- Google Fonts: Inter & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
+
+  <style>
+    :root {
+      --primary: #4f46e5;
+      --primary-hover: #4338ca;
+      --primary-light: #eef2ff;
+      --accent-ponto-a: #10b981;
+      --accent-ponto-b: #ef4444;
+      --color-euclid: #f43f5e;
+      --color-manhattan: #f59e0b;
+      --color-route: #2563eb;
+      
+      --bg-panel: #ffffff;
+      --bg-muted: #f8fafc;
+      --border-color: #e2e8f0;
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+      --text-sub: #475569;
+      --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+      --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.08), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+      --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
+      --radius: 12px;
+      --radius-sm: 8px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; color: var(--text-main); background: #f1f5f9; overflow: hidden; }
+
+    #app-container {
+      display: flex;
+      height: 100vh;
+      width: 100vw;
+      position: relative;
+    }
+
+    /* =================== PAINEL LATERAL =================== */
+    #painel {
+      width: 410px;
+      min-width: 410px;
+      height: 100%;
+      background: var(--bg-panel);
+      border-right: 1px solid var(--border-color);
+      display: flex;
+      flex-direction: column;
+      box-shadow: var(--shadow-lg);
+      z-index: 1000;
+      transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .painel-header {
+      padding: 18px 20px;
+      background: linear-gradient(135deg, #1e1b4b 0%, #312e81 100%);
+      color: white;
+      position: relative;
+    }
+
+    .header-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      background: rgba(255, 255, 255, 0.15);
+      padding: 3px 8px;
+      border-radius: 20px;
+      margin-bottom: 8px;
+      backdrop-filter: blur(4px);
+    }
+
+    .painel-header h1 {
+      font-size: 20px;
+      font-weight: 700;
+      line-height: 1.25;
+      letter-spacing: -0.02em;
+    }
+
+    .painel-header p {
+      font-size: 13px;
+      color: #cbd5e1;
+      margin-top: 5px;
+    }
+
+    .painel-content {
+      padding: 18px 20px 30px;
+      overflow-y: auto;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+
+    /* Scrollbar estilizada */
+    .painel-content::-webkit-scrollbar { width: 6px; }
+    .painel-content::-webkit-scrollbar-track { background: transparent; }
+    .painel-content::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+    .painel-content::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+    /* =================== SEÇÕES & CARDS =================== */
+    .section-title {
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .card {
+      background: var(--bg-muted);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius);
+      padding: 14px;
+      transition: all 0.2s ease;
+    }
+
+    .card:hover {
+      border-color: #cbd5e1;
+    }
+
+    /* =================== INSTRUÇÃO INTERATIVA =================== */
+    .instruction-box {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      border-radius: var(--radius);
+      padding: 12px 14px;
+      color: #1e40af;
+      font-size: 13px;
+      font-weight: 500;
+    }
+
+    .instruction-icon {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: #dbeafe;
+      flex-shrink: 0;
+    }
+
+    /* =================== BUSCA E LOCALIZAÇÃO =================== */
+    .search-wrapper {
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+
+    .search-input {
+      width: 100%;
+      height: 40px;
+      padding: 0 76px 0 38px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border-color);
+      font-size: 13.5px;
+      font-family: inherit;
+      background: #ffffff;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    .search-input:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.15);
+    }
+
+    .search-icon-left {
+      position: absolute;
+      left: 12px;
+      color: var(--text-muted);
+      pointer-events: none;
+    }
+
+    .btn-search {
+      position: absolute;
+      right: 6px;
+      height: 28px;
+      padding: 0 10px;
+      background: var(--primary);
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .btn-search:hover { background: var(--primary-hover); }
+
+    .search-quick-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 8px;
+    }
+
+    .btn-secondary {
+      flex: 1;
+      height: 34px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      font-size: 12.5px;
+      font-weight: 600;
+      background: white;
+      color: var(--text-sub);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn-secondary:hover {
+      background: var(--bg-muted);
+      color: var(--text-main);
+      border-color: #cbd5e1;
+    }
+
+    .btn-clear {
+      color: #dc2626;
+      border-color: #fecaca;
+      background: #fff5f5;
+    }
+    .btn-clear:hover {
+      background: #fee2e2;
+      border-color: #fca5a5;
+      color: #b91c1c;
+    }
+
+    #msg {
+      font-size: 12px;
+      color: #dc2626;
+      min-height: 16px;
+      margin-top: 4px;
+      font-weight: 500;
+    }
+
+    /* =================== SELETOR DE MODO DE TRANSPORTE =================== */
+    .mode-selector {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 6px;
+      background: #e2e8f0;
+      padding: 4px;
+      border-radius: var(--radius-sm);
+    }
+
+    .mode-btn {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      padding: 8px 4px;
+      font-size: 11.5px;
+      font-weight: 600;
+      border: none;
+      background: transparent;
+      color: var(--text-sub);
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .mode-btn svg { width: 18px; height: 18px; stroke: currentColor; }
+
+    .mode-btn.active {
+      background: white;
+      color: var(--primary);
+      box-shadow: var(--shadow-sm);
+    }
+
+    /* =================== CARDS DE PONTOS A & B =================== */
+    .points-container {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .point-badge {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      padding: 10px;
+      border-radius: var(--radius-sm);
+      background: white;
+      border: 1px solid var(--border-color);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .point-badge::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 4px;
+      height: 100%;
+    }
+
+    .point-badge.ponto-a::before { background: var(--accent-ponto-a); }
+    .point-badge.ponto-b::before { background: var(--accent-ponto-b); }
+
+    .point-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .point-title {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .point-indicator {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+    }
+    .point-indicator.a { background: var(--accent-ponto-a); }
+    .point-indicator.b { background: var(--accent-ponto-b); }
+
+    .point-coords {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      color: var(--text-muted);
+      line-height: 1.4;
+    }
+
+    /* =================== GRID DE MÉTRICAS MATEMÁTICAS =================== */
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .metric-card {
+      background: white;
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-sm);
+      padding: 10px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      position: relative;
+    }
+
+    .metric-label-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .metric-name {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+
+    .metric-tag {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      font-weight: 600;
+      padding: 2px 5px;
+      border-radius: 4px;
+    }
+
+    .tag-euclid { background: #ffe4e6; color: #e11d48; }
+    .tag-manhattan { background: #fef3c7; color: #d97706; }
+    .tag-chebyshev { background: #e0e7ff; color: #4338ca; }
+    .tag-delta { background: #f1f5f9; color: #475569; }
+
+    .metric-val {
+      font-size: 17px;
+      font-weight: 700;
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--text-main);
+      letter-spacing: -0.02em;
+    }
+
+    /* =================== CARD ROTA REAL (OSRM) =================== */
+    .route-card {
+      background: white;
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius);
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .route-header-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid #f1f5f9;
+      padding-bottom: 8px;
+    }
+
+    .route-status {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--color-route);
+    }
+
+    .route-stats-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      text-align: center;
+    }
+
+    .route-stat-box {
+      background: var(--bg-muted);
+      border-radius: 6px;
+      padding: 8px 4px;
+    }
+
+    .route-stat-val {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--text-main);
+    }
+
+    .route-stat-lbl {
+      font-size: 10.5px;
+      font-weight: 500;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    .sinuosity-box {
+      background: #f8fafc;
+      border: 1px dashed #cbd5e1;
+      border-radius: 6px;
+      padding: 10px;
+      font-size: 11.5px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .sinuosity-line {
+      display: flex;
+      justify-content: space-between;
+      font-weight: 500;
+    }
+
+    .sinuosity-bar-bg {
+      height: 6px;
+      background: #e2e8f0;
+      border-radius: 3px;
+      overflow: hidden;
+    }
+
+    .sinuosity-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #10b981 0%, #3b82f6 50%, #f59e0b 100%);
+      width: 0%;
+      border-radius: 3px;
+      transition: width 0.4s ease;
+    }
+
+    /* =================== SEÇÃO FÓRMULAS & FUNDAMENTAÇÃO =================== */
+    .formula-accordion {
+      background: var(--bg-muted);
+      border: 1px solid var(--border-color);
+      color: var(--text-main);
+      border-radius: var(--radius);
+      padding: 12px 14px;
+    }
+
+    .formula-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .formula-title {
+      font-size: 12.5px;
+      font-weight: 600;
+      color: var(--text-main);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .formula-content {
+      margin-top: 10px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11.5px;
+      line-height: 1.6;
+      color: var(--text-sub);
+      border-top: 1px solid var(--border-color);
+      padding-top: 10px;
+    }
+
+    .formula-content b { color: var(--primary); font-weight: 600; }
+    .formula-content span.highlight { color: #d97706; font-weight: 600; }
+
+    /* =================== MAPA & CONTROLES FLUTUANTES =================== */
+    #map-wrapper {
+      flex: 1;
+      height: 100%;
+      position: relative;
+    }
+
+    #map {
+      width: 100%;
+      height: 100%;
+      background: #e2e8f0;
+    }
+
+    /* Seletor de Camadas Flutuante */
+    .floating-layer-switcher {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      z-index: 1000;
+      background: white;
+      border-radius: var(--radius);
+      box-shadow: var(--shadow-md);
+      padding: 5px;
+      display: flex;
+      gap: 4px;
+      border: 1px solid var(--border-color);
+    }
+
+    .layer-btn {
+      border: none;
+      background: transparent;
+      padding: 6px 10px;
+      font-size: 11.5px;
+      font-weight: 600;
+      color: var(--text-sub);
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      transition: all 0.2s;
+    }
+
+    .layer-btn:hover { background: var(--bg-muted); color: var(--text-main); }
+    .layer-btn.active { background: var(--primary-light); color: var(--primary); }
+
+    /* Legenda Flutuante no Mapa */
+    .floating-legend {
+      position: absolute;
+      bottom: 24px;
+      right: 16px;
+      z-index: 1000;
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(8px);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow-md);
+      padding: 10px 14px;
+      border: 1px solid var(--border-color);
+      font-size: 11.5px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .legend-title {
+      font-size: 10.5px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      margin-bottom: 2px;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--text-sub);
+      font-weight: 500;
+    }
+
+    .legend-line {
+      width: 20px;
+      height: 3px;
+      border-radius: 2px;
+    }
+    .legend-line.route { background: var(--color-route); height: 4px; }
+    .legend-line.manhattan { background: var(--color-manhattan); }
+    .legend-line.euclid { background: var(--color-euclid); border-top: 2px dashed var(--color-euclid); height: 0; }
+
+    /* Marcadores Customizados no Leaflet */
+    .custom-marker {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 34px;
+      height: 34px;
+      border-radius: 50% 50% 50% 0;
+      transform: rotate(-45deg);
+      box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+      cursor: grab;
+      transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    .custom-marker:active {
+      cursor: grabbing;
+      transform: rotate(-45deg) scale(1.15);
+    }
+
+    .marker-inner {
+      transform: rotate(45deg);
+      color: white;
+      font-weight: 800;
+      font-size: 14px;
+      font-family: 'Inter', sans-serif;
+    }
+
+    .marker-a { background: linear-gradient(135deg, #10b981 0%, #059669 100%); }
+    .marker-b { background: linear-gradient(135deg, #f43f5e 0%, #e11d48 100%); }
+
+    /* Responsividade */
+    @media (max-width: 860px) {
+      #app-container { flex-direction: column; }
+      #painel {
+        width: 100%;
+        min-width: 100%;
+        height: 50%;
+        border-right: none;
+        border-bottom: 1px solid var(--border-color);
+      }
+      #map-wrapper { height: 50%; }
+      .floating-layer-switcher { top: 10px; right: 10px; }
+      .floating-legend { bottom: 10px; right: 10px; }
+    }
+  </style>
+</head>
+<body>
+
+<div id="app-container">
+  
+  <!-- PAINEL LATERAL -->
+  <aside id="painel">
+    
+    <header class="painel-header">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+        <div class="header-badge">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+          Álgebra Linear & Métricas
+        </div>
+        <a href="apresentacao.html" style="color:white; text-decoration:none; font-size:11.5px; font-weight:600; background:rgba(255,255,255,0.18); padding:3px 9px; border-radius:6px; display:inline-flex; align-items:center; gap:4px; backdrop-filter:blur(4px); transition:background 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.28)'" onmouseout="this.style.background='rgba(255,255,255,0.18)'">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+          Apresentação
+        </a>
+      </div>
+      <h1>Mapa de Distâncias</h1>
+      <p>Compare métricas no espaço plano com rotas em malha viária real.</p>
+    </header>
+
+    <div class="painel-content">
+      
+      <!-- INSTRUÇÃO -->
+      <div class="instruction-box" id="instruction-box">
+        <div class="instruction-icon">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+        </div>
+        <span id="instruction-text">Clique no mapa para marcar o ponto <b>A</b> e em seguida o ponto <b>B</b>.</span>
+      </div>
+
+      <!-- BUSCA DE ENDEREÇO -->
+      <div>
+        <div class="section-title">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+          Localização & Busca
+        </div>
+        
+        <div class="search-wrapper">
+          <svg class="search-icon-left" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+          <input type="text" id="busca" class="search-input" placeholder="Ex: Av. Paulista, São Paulo..." onkeydown="if(event.key === 'Enter') buscarEndereco();">
+          <button class="btn-search" onclick="buscarEndereco()">Buscar</button>
+        </div>
+        
+        <div class="search-quick-actions">
+          <button class="btn-secondary" onclick="irParaMinhaLocalizacao()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><point cx="12" cy="12" r="3"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2"/></svg>
+            Minha Localização
+          </button>
+          <button class="btn-secondary btn-clear" onclick="limpar()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+            Limpar
+          </button>
+        </div>
+        <div id="msg"></div>
+      </div>
+
+      <!-- MODO DE TRANSPORTE (ROTA REAL) -->
+      <div>
+        <div class="section-title">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg>
+          Modo da Rota Real
+        </div>
+        <div class="mode-selector">
+          <button class="mode-btn active" id="btn-driving" onclick="selecionarModo('driving')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"/><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/></svg>
+            Carro
+          </button>
+          <button class="mode-btn" id="btn-cycling" onclick="selecionarModo('cycling')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="5.5" cy="17.5" r="3.5"/><circle cx="18.5" cy="17.5" r="3.5"/><path d="M15 6a1 1 0 1 0 0-2 1 1 0 0 0 0 2zm-3 11.5L9 6H5M12 9l3.5 4.5H19"/></svg>
+            Bicicleta
+          </button>
+          <button class="mode-btn" id="btn-walking" onclick="selecionarModo('walking')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m13 4 1.5 6.5L18 13M6 21l3-7 2 3.5 3.5-1.5M10 5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3z"/></svg>
+            A pé
+          </button>
+        </div>
+        <input type="hidden" id="modo" value="driving">
+      </div>
+
+      <!-- COORDENADAS DOS PONTOS -->
+      <div>
+        <div class="section-title">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a8 8 0 0 0-8 8c0 5.25 8 12 8 12s8-6.75 8-12a8 8 0 0 0-8-8z"/><circle cx="12" cy="10" r="3"/></svg>
+          Pontos Marcados
+        </div>
+        <div class="points-container">
+          <div class="point-badge ponto-a">
+            <div class="point-header">
+              <span class="point-title"><span class="point-indicator a"></span> Ponto A</span>
+              <span style="color:var(--accent-ponto-a); font-size:11px;">Origem</span>
+            </div>
+            <div class="point-coords" id="coords-a">Não definido</div>
+          </div>
+          <div class="point-badge ponto-b">
+            <div class="point-header">
+              <span class="point-title"><span class="point-indicator b"></span> Ponto B</span>
+              <span style="color:var(--accent-ponto-b); font-size:11px;">Destino</span>
+            </div>
+            <div class="point-coords" id="coords-b">Não definido</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- DISTÂNCIAS (MÉTRICAS MATEMÁTICAS) -->
+      <div>
+        <div class="section-title">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.3 8.7 8.7 21.3c-1 1-2.5 1-3.4 0l-2.6-2.6c-1-1-1-2.5 0-3.4L15.3 2.7c1-1 2.5-1 3.4 0l2.6 2.6c1 1 1 2.5 0 3.4zM7.5 10.5l2 2M10.5 7.5l2 2M13.5 4.5l2 2"/></svg>
+          Métricas Teóricas no Plano
+        </div>
+        
+        <div class="metrics-grid">
+          <!-- Euclidiana -->
+          <div class="metric-card">
+            <div class="metric-label-row">
+              <span class="metric-name">Euclidiana</span>
+              <span class="metric-tag tag-euclid">L₂</span>
+            </div>
+            <div class="metric-val" id="val-euclid">-</div>
+          </div>
+
+          <!-- Manhattan -->
+          <div class="metric-card">
+            <div class="metric-label-row">
+              <span class="metric-name">Manhattan</span>
+              <span class="metric-tag tag-manhattan">L₁</span>
+            </div>
+            <div class="metric-val" id="val-manhattan">-</div>
+          </div>
+
+          <!-- Chebyshev -->
+          <div class="metric-card">
+            <div class="metric-label-row">
+              <span class="metric-name">Chebyshev</span>
+              <span class="metric-tag tag-chebyshev">L∞</span>
+            </div>
+            <div class="metric-val" id="val-chebyshev">-</div>
+          </div>
+
+          <!-- Deslocamentos Delta -->
+          <div class="metric-card">
+            <div class="metric-label-row">
+              <span class="metric-name">Componentes</span>
+              <span class="metric-tag tag-delta">Δx / Δy</span>
+            </div>
+            <div class="metric-val" style="font-size: 13px; line-height: 1.3;" id="val-deltas">
+              Δx: -<br>Δy: -
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ROTA REAL PELAS RUAS -->
+      <div>
+        <div class="section-title">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="6" cy="19" r="3"/><path d="M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15"/><circle cx="18" cy="5" r="3"/></svg>
+          Trajeto Real nas Ruas (OSRM)
+        </div>
+
+        <div class="route-card" id="route-card">
+          <div class="route-header-row">
+            <div class="route-status">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+              <span id="route-status-text">Aguardando pontos...</span>
+            </div>
+            <span id="route-mode-badge" style="font-size:11px; font-weight:600; color:var(--text-muted);">Carro</span>
+          </div>
+
+          <div class="route-stats-grid">
+            <div class="route-stat-box">
+              <div class="route-stat-val" id="route-dist">-</div>
+              <div class="route-stat-lbl">Distância</div>
+            </div>
+            <div class="route-stat-box">
+              <div class="route-stat-val" id="route-time">-</div>
+              <div class="route-stat-lbl">Tempo Est.</div>
+            </div>
+            <div class="route-stat-box">
+              <div class="route-stat-val" id="route-speed">-</div>
+              <div class="route-stat-lbl">Vel. Média</div>
+            </div>
+          </div>
+
+          <!-- Relações de Sinuosidade -->
+          <div class="sinuosity-box" id="sinuosity-container">
+            <div class="sinuosity-line">
+              <span>Sinuosidade (Rota / L₂):</span>
+              <strong id="sinuosity-val">-</strong>
+            </div>
+            <div class="sinuosity-bar-bg">
+              <div class="sinuosity-bar-fill" id="sinuosity-bar"></div>
+            </div>
+            <div class="sinuosity-line" style="color:var(--text-muted); font-size:10.5px;">
+              <span>Razão com Manhattan (Rota / L₁):</span>
+              <strong id="ratio-manhattan-val">-</strong>
+            </div>
+          </div>
+
+          <div id="route-warnings" style="font-size:11.5px; color:#b91c1c;"></div>
+        </div>
+      </div>
+
+      <!-- FÓRMULAS & TEORIA -->
+      <div class="formula-accordion">
+        <div class="formula-header" onclick="toggleFormulas()">
+          <span class="formula-title">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z"/><path d="M6 6h10M6 10h10"/></svg>
+            Fórmulas Matemáticas
+          </span>
+          <svg id="formula-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="transition: transform 0.2s;"><path d="m6 9 6 6 6-6"/></svg>
+        </div>
+        <div class="formula-content" id="formula-body">
+          <b>Projeção Local em ℝ²:</b><br>
+          x = R · (lon − lon₀) · cos(lat_méd)<br>
+          y = R · (lat − lat₀)<br>
+          <span style="font-size:10.5px; color:#64748b;">(R = 6371 km; ângulos em radianos)</span><br><br>
+          <b>Métricas Lₚ:</b><br>
+          • <span class="highlight">Euclidiana (p=2):</span> √(Δx² + Δy²)<br>
+          • <span class="highlight">Manhattan (p=1):</span> |Δx| + |Δy|<br>
+          • <span class="highlight">Chebyshev (p=∞):</span> max(|Δx|, |Δy|)<br>
+          • <span class="highlight">Sinuosidade:</span> Dist_Real / Euclidiana
+        </div>
+      </div>
+
+    </div>
+  </aside>
+
+  <!-- ÁREA DO MAPA -->
+  <main id="map-wrapper">
+    
+    <!-- Seletor Flutuante de Estilo de Mapa -->
+    <div class="floating-layer-switcher">
+      <button class="layer-btn active" id="layer-relevo" onclick="trocarCamada('relevo')">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m8 3 4 8 5-5 5 15H2L8 3z"/></svg>
+        Relevo
+      </button>
+      <button class="layer-btn" id="layer-satelite" onclick="trocarCamada('satelite')">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20M2 12h20"/></svg>
+        Satélite
+      </button>
+    </div>
+
+    <!-- Legenda Flutuante -->
+    <div class="floating-legend">
+      <div class="legend-title">Traçados no Mapa</div>
+      <div class="legend-item">
+        <div class="legend-line route"></div>
+        <span>Rota Real (OSRM)</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-line manhattan"></div>
+        <span>Manhattan (L₁)</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-line euclid"></div>
+        <span>Euclidiana (L₂)</span>
+      </div>
+    </div>
+
+    <!-- O Mapa Leaflet -->
+    <div id="map"></div>
+  </main>
+
+</div>
+
+<!-- Scripts -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+<script>
+const R = 6371; // Raio da Terra em km
+
+// ---------- Camadas de Mapa ----------
+const camadasBase = {
+  relevo: L.tileLayer("https://tile.opentopomap.org/{z}/{x}/{y}.png", {
+    maxZoom: 17,
+    attribution: "© OpenTopoMap, © OpenStreetMap"
+  }),
+  satelite: L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", {
+    maxZoom: 18,
+    attribution: "© Esri, Maxar, Earthstar Geographics"
+  })
+};
+
+let camadaAtiva = camadasBase.relevo;
+const map = L.map("map", {
+  center: [-23.55, -46.63],
+  zoom: 12,
+  zoomControl: false,
+  layers: [camadaAtiva]
+});
+
+// Controles no Mapa
+L.control.zoom({ position: "bottomleft" }).addTo(map);
+L.control.scale({ imperial: false, position: "bottomleft" }).addTo(map);
+
+// Evita mapa cinza se a janela redimensionar
+new ResizeObserver(() => map.invalidateSize()).observe(document.getElementById("map"));
+
+function trocarCamada(tipo) {
+  map.removeLayer(camadaAtiva);
+  camadaAtiva = camadasBase[tipo];
+  map.addLayer(camadaAtiva);
+
+  document.querySelectorAll(".layer-btn").forEach(btn => btn.classList.remove("active"));
+  const btn = document.getElementById("layer-" + tipo);
+  if (btn) btn.classList.add("active");
+}
+
+// ---------- Estado da Aplicação ----------
+let pontos = [];          // [{lat, lng}]
+let marcadores = [];      // Leaflet markers
+let camadas = [];         // Polylines e GeoJSON
+let temporizador = null;  // Debounce para rotas
+let pedidoAtual = 0;
+
+// ---------- Ícones Customizados de Marcadores ----------
+function criarIcone(letra, classeTipo) {
+  return L.divIcon({
+    className: "custom-div-icon",
+    html: `<div class="custom-marker ${classeTipo}"><span class="marker-inner">${letra}</span></div>`,
+    iconSize: [34, 34],
+    iconAnchor: [17, 34],
+    popupAnchor: [0, -32]
+  });
+}
+
+// ---------- Matemática & Projeções ----------
+function projetar(ponto, origem, latRef) {
+  const rad = Math.PI / 180;
+  return {
+    x: R * (ponto.lng - origem.lng) * rad * Math.cos(latRef * rad),
+    y: R * (ponto.lat - origem.lat) * rad
+  };
+}
+
+function medidas(A, B) {
+  const latMedia = (A.lat + B.lat) / 2;
+  const pb = projetar(B, A, latMedia);
+  const dx = pb.x, dy = pb.y;
+  return {
+    dx: dx,
+    dy: dy,
+    euclid: Math.sqrt(dx * dx + dy * dy),
+    manhattan: Math.abs(dx) + Math.abs(dy),
+    chebyshev: Math.max(Math.abs(dx), Math.abs(dy))
+  };
+}
+
+function formatarTempo(minutos) {
+  const total = Math.round(minutos);
+  const horas = Math.floor(total / 60);
+  const resto = total % 60;
+  if (horas === 0) return resto + " min";
+  const textoResto = resto < 10 ? "0" + resto : "" + resto;
+  return horas + "h " + textoResto + " min";
+}
+
+function fmt(km) {
+  if (km === undefined || isNaN(km)) return "-";
+  return km < 1 ? (km * 1000).toFixed(0) + " m" : km.toFixed(3) + " km";
+}
+
+// ---------- Interações do Mapa ----------
+map.on("click", function (e) {
+  if (pontos.length >= 2) {
+    limpar();
+  }
+  adicionarPonto(e.latlng.lat, e.latlng.lng);
+});
+
+function adicionarPonto(lat, lng) {
+  const isA = pontos.length === 0;
+  const nome = isA ? "A" : "B";
+  const classeTipo = isA ? "marker-a" : "marker-b";
+  
+  pontos.push({ lat: lat, lng: lng });
+
+  const m = L.marker([lat, lng], {
+    icon: criarIcone(nome, classeTipo),
+    draggable: true
+  }).addTo(map);
+
+  m.bindPopup(`<b>Ponto ${nome}</b><br><small>Arraste para reposicionar</small>`);
+
+  const indice = pontos.length - 1;
+  m.on("dragend", function () {
+    const pos = m.getLatLng();
+    pontos[indice] = { lat: pos.lat, lng: pos.lng };
+    calcularTudo();
+  });
+
+  marcadores.push(m);
+  calcularTudo();
+}
+
+function limpar() {
+  clearTimeout(temporizador);
+  pedidoAtual++;
+  marcadores.forEach(m => map.removeLayer(m));
+  camadas.forEach(c => map.removeLayer(c));
+  pontos = [];
+  marcadores = [];
+  camadas = [];
+
+  // Reset UI
+  document.getElementById("coords-a").textContent = "Não definido";
+  document.getElementById("coords-b").textContent = "Não definido";
+  document.getElementById("val-euclid").textContent = "-";
+  document.getElementById("val-manhattan").textContent = "-";
+  document.getElementById("val-chebyshev").textContent = "-";
+  document.getElementById("val-deltas").innerHTML = "Δx: -<br>Δy: -";
+  
+  document.getElementById("route-status-text").textContent = "Aguardando pontos...";
+  document.getElementById("route-dist").textContent = "-";
+  document.getElementById("route-time").textContent = "-";
+  document.getElementById("route-speed").textContent = "-";
+  document.getElementById("sinuosity-val").textContent = "-";
+  document.getElementById("ratio-manhattan-val").textContent = "-";
+  document.getElementById("sinuosity-bar").style.width = "0%";
+  document.getElementById("route-warnings").innerHTML = "";
+  document.getElementById("msg").textContent = "";
+
+  document.getElementById("instruction-text").innerHTML = "Clique no mapa para marcar o ponto <b>A</b> e em seguida o ponto <b>B</b>.";
+}
+
+function selecionarModo(modo) {
+  document.getElementById("modo").value = modo;
+  document.querySelectorAll(".mode-btn").forEach(b => b.classList.remove("active"));
+  document.getElementById("btn-" + modo).classList.add("active");
+  
+  const nomes = { driving: "Carro", cycling: "Bicicleta", walking: "A pé" };
+  document.getElementById("route-mode-badge").textContent = nomes[modo];
+  
+  if (pontos.length === 2) {
+    calcularTudo();
+  }
+}
+
+function calcularTudo() {
+  clearTimeout(temporizador);
+  pedidoAtual++;
+  camadas.forEach(c => map.removeLayer(c));
+  camadas = [];
+
+  // Atualizar visualização dos pontos
+  if (pontos[0]) {
+    document.getElementById("coords-a").innerHTML = `${pontos[0].lat.toFixed(5)}°<br>${pontos[0].lng.toFixed(5)}°`;
+    document.getElementById("instruction-text").innerHTML = "Ponto <b>A</b> marcado! Agora clique no destino <b>B</b>.";
+  }
+  if (pontos[1]) {
+    document.getElementById("coords-b").innerHTML = `${pontos[1].lat.toFixed(5)}°<br>${pontos[1].lng.toFixed(5)}°`;
+    document.getElementById("instruction-text").innerHTML = "Pontos <b>A</b> e <b>B</b> definidos. Arraste qualquer marcador se desejar.";
+  }
+
+  if (pontos.length < 2) return;
+
+  const A = pontos[0], B = pontos[1];
+  const m = medidas(A, B);
+
+  // Preencher métricas nos cards
+  document.getElementById("val-euclid").textContent = fmt(m.euclid);
+  document.getElementById("val-manhattan").textContent = fmt(m.manhattan);
+  document.getElementById("val-chebyshev").textContent = fmt(m.chebyshev);
+  document.getElementById("val-deltas").innerHTML = `Δx: ${fmt(Math.abs(m.dx))}<br>Δy: ${fmt(Math.abs(m.dy))}`;
+
+  // Linha Euclidiana (Rosa, tracejada elegante)
+  const linhaEuclid = L.polyline([A, B], {
+    color: "#f43f5e",
+    weight: 3.5,
+    dashArray: "8, 8",
+    opacity: 0.9
+  }).addTo(map).bindTooltip(`<b>Distância Euclidiana:</b> ${fmt(m.euclid)}`, { sticky: true });
+  camadas.push(linhaEuclid);
+
+  // Caminho Manhattan (Âmbar/Laranja em esquadro)
+  const canto = { lat: A.lat, lng: B.lng };
+  const linhaManhattan = L.polyline([A, canto, B], {
+    color: "#f59e0b",
+    weight: 3,
+    opacity: 0.85
+  }).addTo(map).bindTooltip(`<b>Distância Manhattan:</b> ${fmt(m.manhattan)}`, { sticky: true });
+  camadas.push(linhaManhattan);
+
+  // Solicitar rota real com debounce de 400ms
+  document.getElementById("route-status-text").textContent = "Calculando rota real...";
+  temporizador = setTimeout(() => {
+    buscarRota(A, B, m.euclid, m.manhattan, 1);
+  }, 400);
+}
+
+// ---------- Rota Real (OSRM) ----------
+function buscarRota(A, B, euclid, manhattan, tentativa) {
+  const modo = document.getElementById("modo").value;
+  const servidores = { driving: "routed-car", cycling: "routed-bike", walking: "routed-foot" };
+  const nomes = { driving: "Carro", cycling: "Bicicleta", walking: "A pé" };
+  const url = `https://routing.openstreetmap.de/${servidores[modo]}/route/v1/driving/${A.lng},${A.lat};${B.lng},${B.lat}?overview=full&geometries=geojson`;
+  
+  pedidoAtual++;
+  const meuPedido = pedidoAtual;
+
+  fetch(url)
+    .then(r => r.json())
+    .then(dados => {
+      if (meuPedido !== pedidoAtual) return;
+
+      if (dados.code === "NoRoute") {
+        document.getElementById("route-status-text").textContent = "Sem rota viável";
+        document.getElementById("route-warnings").textContent = `Não há caminho de ${nomes[modo].toLowerCase()} conectando esses pontos. Aproxime os pontos de vias navegáveis.`;
+        return;
+      }
+      if (dados.code !== "Ok" || !dados.routes || !dados.routes.length) {
+        document.getElementById("route-status-text").textContent = "Erro de rota";
+        document.getElementById("route-warnings").textContent = `Servidor retornou código: ${dados.code}`;
+        return;
+      }
+
+      document.getElementById("route-status-text").textContent = `Rota calculada (${nomes[modo]})`;
+      document.getElementById("route-warnings").innerHTML = "";
+
+      const rota = dados.routes[0];
+      const km = rota.distance / 1000;
+      const min = rota.duration / 60;
+
+      // Desenhar linha de contorno (casing) para visual premium
+      const casing = L.geoJSON(rota.geometry, {
+        style: { color: "#1e3a8a", weight: 7, opacity: 0.4 }
+      }).addTo(map);
+      camadas.push(casing);
+
+      // Traçado principal azul
+      const linha = L.geoJSON(rota.geometry, {
+        style: { color: "#2563eb", weight: 4.5, opacity: 0.95 }
+      }).addTo(map);
+      camadas.push(linha);
+
+      // Linhas pontilhadas até a via mais próxima
+      const originais = [A, B];
+      let avisoWaypoint = "";
+      dados.waypoints.forEach((w, i) => {
+        if (w.distance > 15) {
+          const colado = [w.location[1], w.location[0]];
+          camadas.push(L.polyline([[originais[i].lat, originais[i].lng], colado], {
+            color: "#64748b",
+            weight: 2.5,
+            dashArray: "3, 6"
+          }).addTo(map));
+        }
+        if (w.distance > 200) {
+          avisoWaypoint += `Ponto ${i === 0 ? "A" : "B"} a ${w.distance.toFixed(0)}m da via mais próxima.<br>`;
+        }
+      });
+      if (avisoWaypoint) {
+        document.getElementById("route-warnings").innerHTML = avisoWaypoint;
+      }
+
+      map.fitBounds(linha.getBounds(), { padding: [50, 50] });
+
+      // Atualizar estatísticas da rota
+      document.getElementById("route-dist").textContent = fmt(km);
+      document.getElementById("route-time").textContent = formatarTempo(min);
+      document.getElementById("route-speed").textContent = min > 0 ? (km / (min / 60)).toFixed(1) + " km/h" : "-";
+
+      // Sinuosidade e Razão
+      if (euclid > 0) {
+        const sinuosidade = (km / euclid);
+        document.getElementById("sinuosity-val").textContent = sinuosidade.toFixed(2) + "×";
+        
+        // Barra percentual: 1.0 é linha reta perfeita, 2.0+ é rota muito tortuosa
+        const barPct = Math.min(100, Math.max(10, (sinuosidade - 1.0) * 100));
+        document.getElementById("sinuosity-bar").style.width = barPct + "%";
+      }
+
+      if (manhattan > 0) {
+        document.getElementById("ratio-manhattan-val").textContent = (km / manhattan).toFixed(2);
+      }
+    })
+    .catch(() => {
+      if (meuPedido !== pedidoAtual) return;
+      if (tentativa < 2) {
+        document.getElementById("route-status-text").textContent = "Reconectando servidor...";
+        temporizador = setTimeout(() => buscarRota(A, B, euclid, manhattan, tentativa + 1), 1500);
+      } else {
+        document.getElementById("route-status-text").textContent = "Serviço de rota offline";
+        document.getElementById("route-warnings").textContent = "Não foi possível conectar ao servidor de rotas da OSM. Verifique sua conexão.";
+      }
+    });
+}
+
+// ---------- Busca Nominatim & Geolocalização ----------
+function buscarEndereco() {
+  const q = document.getElementById("busca").value.trim();
+  if (!q) return;
+
+  const msg = document.getElementById("msg");
+  msg.textContent = "Buscando localização...";
+
+  fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(q)}`)
+    .then(r => r.json())
+    .then(res => {
+      if (!res || res.length === 0) {
+        msg.textContent = "Endereço não localizado.";
+        return;
+      }
+      msg.textContent = "";
+      const lat = parseFloat(res[0].lat);
+      const lon = parseFloat(res[0].lon);
+      map.setView([lat, lon], 15);
+      
+      // Feedback temporário
+      L.popup().setLatLng([lat, lon]).setContent(`<b>${res[0].display_name.split(",")[0]}</b>`).openOn(map);
+    })
+    .catch(() => {
+      msg.textContent = "Erro na busca de endereço.";
+    });
+}
+
+function irParaMinhaLocalizacao() {
+  const msg = document.getElementById("msg");
+  if (!navigator.geolocation) {
+    msg.textContent = "Geolocalização não suportada no seu navegador.";
+    return;
+  }
+  msg.textContent = "Localizando...";
+  navigator.geolocation.getCurrentPosition(
+    pos => {
+      msg.textContent = "";
+      map.setView([pos.coords.latitude, pos.coords.longitude], 15);
+    },
+    () => {
+      msg.textContent = "Permissão de localização negada ou indisponível.";
+    }
+  );
+}
+
+// Accordion Fórmulas
+let formulasAbertas = true;
+function toggleFormulas() {
+  const body = document.getElementById("formula-body");
+  const arrow = document.getElementById("formula-arrow");
+  formulasAbertas = !formulasAbertas;
+  body.style.display = formulasAbertas ? "block" : "none";
+  arrow.style.transform = formulasAbertas ? "rotate(0deg)" : "rotate(-90deg)";
+}
+</script>
+</body>
+</html>
